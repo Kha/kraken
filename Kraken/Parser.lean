@@ -541,7 +541,7 @@ def parseInstr : Parser Instr := do
     let w ← instrWidth mn
     commaSeparated w parseOperand parseRegOrMem .mov
 
-  | "moszx" =>
+  | "movsx" =>
     -- Must be a register otherwise lacking type info
     let ⟨ _w_src, src ⟩ ← parseRegW
     let ⟨ w_dst, dst ⟩ ← parseRegW
@@ -559,7 +559,7 @@ def parseInstr : Parser Instr := do
     let w_src ← Char.toWidth c_src
     let src ← parseRegWithType w_src; parseComma
     let dst ← parseRegWithType w_dst
-    pure ⟨ .W64, w_dst, .movzx dst (.Reg src) ⟩
+    pure ⟨ .W64, w_dst, .movsx dst (.Reg src) ⟩
 
   | "movzbw" | "movzbl" | "movzbq" | "movzwl" | "movzwq" =>
     let w_dst ← instrWidth mn
@@ -764,7 +764,7 @@ def parseInstr : Parser Instr := do
       skipHWs
       let sz ← parseHexOrDec
       pure ⟨ .W64, .W64, .nop sz.toNat ⟩
-    ) <|> (pure ⟨ .W64, .W64, .nop 0 ⟩)
+    ) <|> (pure ⟨ .W64, .W64, .nop 1 ⟩)
 
   -- Control flow - conditional jumps
   | _ =>

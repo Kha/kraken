@@ -28,5 +28,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1
-      - run: lake build krakenrunner
+      - run: lake build krakenrunner att2intel
       - run: python3 Kraken/Test/asm_tests.py Kraken/Test/asm

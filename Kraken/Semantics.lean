@@ -801,3 +801,131 @@ namespace Reg
 @[match_pattern] abbrev r14b := low .r14 .W8
 @[match_pattern] abbrev r15b := low .r15 .W8
 end Reg
+
+instance : ToString Reg64 where
+  toString r := match r with
+  | .rax => "rax" | .rbx => "rbx" | .rcx => "rcx" | .rdx => "rdx"
+  | .rsi => "rsi" | .rdi => "rdi" | .rsp => "rsp" | .rbp => "rbp"
+  | .r8  => "r8"  | .r9  => "r9"  | .r10 => "r10" | .r11 => "r11"
+  | .r12 => "r12" | .r13 => "r13" | .r14 => "r14" | .r15 => "r15"
+
+def Reg.toStr {w} (r : Reg w) : String := match w, r with
+  | .W64, .low r _ => toString r
+  | .W32, .low r _ => match r with
+    | .rax => "eax" | .rbx => "ebx" | .rcx => "ecx" | .rdx => "edx"
+    | .rsi => "esi" | .rdi => "edi" | .rsp => "esp" | .rbp => "ebp"
+    | .r8  => "r8d" | .r9  => "r9d" | .r10 => "r10d" | .r11 => "r11d"
+    | .r12 => "r12d"| .r13 => "r13d"| .r14 => "r14d"| .r15 => "r15d"
+  | .W16, .low r _ => match r with
+    | .rax => "ax" | .rbx => "bx" | .rcx => "cx" | .rdx => "dx"
+    | .rsi => "si" | .rdi => "di" | .rsp => "sp" | .rbp => "bp"
+    | .r8  => "r8w" | .r9  => "r9w" | .r10 => "r10w" | .r11 => "r11w"
+    | .r12 => "r12w"| .r13 => "r13w"| .r14 => "r14w"| .r15 => "r15w"
+  | .W8, .low r _ => match r with
+    | .rax => "al" | .rbx => "bl" | .rcx => "cl" | .rdx => "dl"
+    | .rsi => "sil" | .rdi => "dil" | .rsp => "spl" | .rbp => "bpl"
+    | .r8  => "r8b" | .r9  => "r9b" | .r10 => "r10b" | .r11 => "r11b"
+    | .r12 => "r12b"| .r13 => "r13b"| .r14 => "r14b"| .r15 => "r15b"
+  | .W8, .ah => "ah" | .W8, .bh => "bh" | .W8, .ch => "ch" | .W8, .dh => "dh"
+
+instance {w} : ToString (Reg w) where toString := Reg.toStr
+
+instance : ToString RegOrRip where
+  toString
+  | .ofRegW ⟨_, r⟩ => toString r
+  | .rip => "rip"
+
+def ConstExpr.toStr : ConstExpr → String
+  | .Label l => l
+  | .Int64 i => s!"{i}"
+  | .before_current_instruction => "."
+  | .after_current_instruction => "."
+  | .add e1 e2 => s!"({e1.toStr} + {e2.toStr})"
+  | .sub e1 e2 => s!"({e1.toStr} - {e2.toStr})"
+instance : ToString ConstExpr where toString := ConstExpr.toStr
+
+def AddrExpr.toStr (a : AddrExpr) : String := "["++ "+".intercalate (
+  (match a.base with | .some b => [toString b] | _ => [])
+  ++(match a.idx with | .some ⟨r, s⟩ => [s!"{r.reg}*{s.bytes}"] | _ => [])
+  ++[toString a.disp]) ++ "]"
+instance : ToString AddrExpr where toString := AddrExpr.toStr
+
+instance {w} : ToString (RegOrMem w) where toString
+  | .Reg r => ToString.toString r
+  | .mem a => match w with
+    | .W64 => "QWORD PTR " ++ toString a
+    | .W32 => "DWORD PTR " ++ toString a
+    | .W16 => "WORD PTR " ++ toString a
+    | .W8 => "BYTE PTR " ++ toString a
+
+instance {w} : ToString (Operand w) where toString
+  | .RegOrMem rm => toString rm
+  | .imm v => toString v
+
+instance : ToString RelRegOrMem where toString
+  | .Rel (.sub e .after_current_instruction) => toString e
+  | .Rel c => toString c
+  | .Reg r => toString r
+  | .mem a => "QWORD PTR " ++ toString a
+
+instance : ToString CondCode where toString
+  | .z => "e" | .nz => "ne" | .c => "b" | .nc => "ae" | .a => "a" | .be => "be"
+
+instance : ToString ShiftCountExpr where toString
+  | .cl => "cl"
+  | .imm8 v => ToString.toString v
+
+instance {w} : ToString (Operation w) where toString
+  | .mov dst src => s!"mov {dst}, {src}"
+  | .movsx dst src => s!"movsx {dst}, {src}"
+  | .movzx dst src => s!"movzx {dst}, {src}"
+  | .push src => s!"push {src}"
+  | .pop dst => s!"pop {dst}"
+  | .setcc cc dst => s!"set{cc} {dst}"
+  | .cmovcc cc dst src => s!"cmov{cc} {dst}, {src}"
+  | .lea dst src => s!"lea {dst}, {src}"
+  | .add dst src => s!"add {dst}, {src}"
+  | .adc dst src => s!"adc {dst}, {src}"
+  | .adcx dst src => s!"adcx {dst}, {src}"
+  | .adox dst src => s!"adox {dst}, {src}"
+  | .inc dst => s!"inc {dst}"
+  | .dec dst => s!"dec {dst}"
+  | .neg dst => s!"neg {dst}"
+  | .sub dst src => s!"sub {dst}, {src}"
+  | .sbb dst src => s!"sbb {dst}, {src}"
+  | .cmp a b => s!"cmp {a}, {b}"
+  | .mul src => s!"mul {src}"
+  | .mulx hi lo src => s!"mulx {hi}, {lo}, {src}"
+  | .imul none src1 src2 => s!"imul {src1}, {src2}"
+  | .imul (some dst) src1 src2 => s!"imul {dst}, {src1}, {src2}"
+  | .test a b => s!"test {a}, {b}"
+  | .and dst src => s!"and {dst}, {src}"
+  | .not dst => s!"not {dst}"
+  | .or dst src => s!"or {dst}, {src}"
+  | .xor dst src => s!"xor {dst}, {src}"
+  | .shl dst cnt => s!"shl {dst}, {cnt}"
+  | .shr dst cnt => s!"shr {dst}, {cnt}"
+  | .sar dst cnt => s!"sar {dst}, {cnt}"
+  | .shld dst src cnt => s!"shld {dst}, {src}, {cnt}"
+  | .shrd dst src cnt => s!"shrd {dst}, {src}, {cnt}"
+  | .rol dst cnt => s!"rol {dst}, {cnt}"
+  | .ror dst cnt => s!"ror {dst}, {cnt}"
+  | .rcl dst cnt => s!"rcl {dst}, {cnt}"
+  | .rcr dst cnt => s!"rcr {dst}, {cnt}"
+  | .bswap dst => s!"bswap {dst}"
+  | .jcc cc l => s!"j{cc} {l}"
+  | .jmp tgt => s!"jmp {tgt}"
+  | .call tgt => s!"call {tgt}"
+  | .ret => "ret"
+  | .nop n => s!".nops {n}"
+  | .nopalign a none => s!".align {a}"
+  | .nopalign a (some p) => s!".align {a}, {p}"
+
+instance : ToString Instr where
+  toString i := ToString.toString i.operation
+
+instance : ToString Directive where
+  toString
+  | .Instr i => ToString.toString i
+  | .Label l => s!"{l}:"
+  | .ByteArray bs => ".byte "++", ".intercalate (bs.toList.map (fun b => s!"{b}"))
